@@ -1,0 +1,9 @@
+[project]
+name = "fraudguard-multiagent"
+version = "0.1.0"
+description = "Sistema multiagente de IA para triaje y validación de alertas de volumen transaccional (Prevención de Fraude)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

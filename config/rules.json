@@ -1,0 +1,62 @@
+{
+  "dataset": {
+    "base_date": "2017-12-01",
+    "history_cutoff_day": 120,
+    "_comment": "Días < history_cutoff_day forman la Base Histórica; los días posteriores generan los reportes de corte simulados."
+  },
+  "alert_generation": {
+    "_comment": "Simula la plataforma de monitoreo: un cliente entra al reporte si su volumen en la ventana del corte supera alguno de estos umbrales.",
+    "min_tx_count": 3,
+    "min_amount_sum": 1000.0
+  },
+  "segmentacion": {
+    "alto": {"monto_tx_min": 500.0, "productos": ["C"], "n_tx_min": 8},
+    "medio": {"monto_tx_min": 100.0, "tipos_tarjeta": ["credit"], "n_tx_min": 5}
+  },
+  "auditor": {
+    "z_count_umbral": 3.0,
+    "z_monto_umbral": 3.0,
+    "ratio_monto_umbral": 3.0,
+    "rafaga_minutos": 10,
+    "rafaga_n_tx": 3,
+    "share_producto_riesgo": 0.5,
+    "productos_riesgo": ["C"],
+    "min_dias_historial": 2
+  },
+  "reglas": {
+    "R01": {"nombre": "Cliente en lista de bloqueo", "peso": 0.45, "dura": true},
+    "R02": {"nombre": "Tarjeta en lista de bloqueo", "peso": 0.40, "dura": true},
+    "R03": {"nombre": "Dispositivo en lista de bloqueo", "peso": 0.35, "dura": true},
+    "R04": {"nombre": "Volumen de transacciones atípico vs. historial (Z-score)", "peso": 0.15, "dura": false},
+    "R05": {"nombre": "Monto atípico vs. historial", "peso": 0.15, "dura": false},
+    "R06": {"nombre": "Dominio de email de alto riesgo", "peso": 0.10, "dura": false},
+    "R07": {"nombre": "Cliente sin historial", "peso": 0.10, "dura": false},
+    "R08": {"nombre": "Múltiples tarjetas en el mismo corte", "peso": 0.15, "dura": false},
+    "R09": {"nombre": "Concentración en producto de alto riesgo", "peso": 0.15, "dura": false},
+    "R10": {"nombre": "Ráfaga de transacciones", "peso": 0.10, "dura": false},
+    "R11": {"nombre": "Score alto del modelo de riesgo transaccional", "peso": 0.50, "dura": false},
+    "R12": {"nombre": "Score intermedio del modelo de riesgo transaccional", "peso": 0.20, "dura": false}
+  },
+  "modelo_riesgo": {
+    "_comment": "Umbrales sobre el score máximo del caso. umbral_bajo define qué casos 'Sin Historial' pueden descartarse automáticamente como FP.",
+    "umbral_alto": 0.50,
+    "umbral_medio": 0.15,
+    "umbral_bajo": 0.004,
+    "sin_historial_fp_con_modelo": true
+  },
+  "clasificador": {
+    "_comment": "score >= umbral_fraude -> Posible Fraude; score <= umbral_fp sin reglas duras y con historial -> Falso Positivo; resto zona gris (LLM o HITL).",
+    "umbral_fraude": 0.60,
+    "umbral_fp": 0.15,
+    "confianza_minima": 0.85,
+    "max_casos_por_llamada_llm": 25
+  },
+  "listas_bloqueo": {
+    "tarjeta_min_tx": 3,
+    "tarjeta_min_tasa_fraude": 0.5,
+    "dispositivo_min_tx": 3,
+    "dispositivo_min_tasa_fraude": 0.5,
+    "email_min_tx": 200,
+    "email_factor_tasa_global": 2.0
+  }
+}

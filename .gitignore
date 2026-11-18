@@ -1,0 +1,23 @@
+# Entorno
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+
+# Datos (Kaggle IEEE-CIS: licencia de la competencia, no redistribuir; además > 100 MB)
+data/raw/
+data/processed/
+data/reports/
+data/ground_truth/
+
+# Artefactos de ejecución
+logs/
+outputs/
+*.sqlite
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
