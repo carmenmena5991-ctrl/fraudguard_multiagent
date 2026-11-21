@@ -127,6 +127,9 @@ class Dictamen(Strict):
     escalado_humano: bool
     score_reglas: float
     reglas_activadas: list[str]
+    # Lo que sugirió el LLM aunque la política lo haya escalado (None si el caso no pasó por el LLM).
+    sugerencia_llm: Optional[Categoria] = None
+    confianza_llm: Optional[float] = Field(default=None, ge=0, le=1)
 
 
 class ClasificadorOutput(Strict):

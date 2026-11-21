@@ -5,6 +5,7 @@ import json
 import threading
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
 from fraudguard import config
@@ -61,6 +62,33 @@ def test_llm_no_descarta_cliente_sin_historial(audit, perfiles, listas):
     _, _, d = _clasificar(audit, perfiles, listas, llm)
     assert d[CLI_NUEVO].categoria == config.CAT_SEGUIMIENTO
     assert "sin historial" in d[CLI_NUEVO].motivo
+
+
+def test_sugerencia_llm_se_guarda_aunque_se_escale(audit, perfiles, listas):
+    llm = FakeLLM(lambda u, s: _lote(u, config.CAT_FP, 0.99, reglas=()))
+    _, _, d = _clasificar(audit, perfiles, listas, llm)
+    assert d[CLI_NUEVO].categoria == config.CAT_SEGUIMIENTO          # la política lo escala
+    assert d[CLI_NUEVO].sugerencia_llm == config.CAT_FP and d[CLI_NUEVO].confianza_llm == 0.99
+    assert all(x.sugerencia_llm is None for x in d.values() if x.fuente == "reglas")
+
+
+def test_resumen_de_sugerencias_en_evaluacion():
+    import importlib.util
+    from pathlib import Path
+
+    ruta = Path(__file__).resolve().parents[1] / "scripts" / "evaluate.py"
+    spec = importlib.util.spec_from_file_location("evaluate", ruta)
+    ev = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ev)
+    df = pd.DataFrame({
+        "sugerencia_llm": [config.CAT_FP, config.CAT_FP, config.CAT_FRAUDE, None],
+        "confianza_llm": [0.9, 0.7, 0.8, None],
+        "fraude_real": [0, 1, 1, 0],
+    })
+    r = ev.sugerencias_llm(df)
+    assert r["n_casos"] == 3 and r["fraudes_que_sugirio_descartar"] == 1
+    assert r["sugerencia_vs_real"][config.CAT_FRAUDE] == {"legitimo": 0, "fraude": 1}
+    assert r["confianza_media"] == {"legitimo": 0.9, "fraude": 0.75}
 
 
 def test_llm_fraude_confiable_se_acepta(audit, perfiles, listas):

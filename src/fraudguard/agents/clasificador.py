@@ -116,13 +116,17 @@ def aplicar_politica(c: CasoAuditado, d: Optional[DictamenLLM], cfg: dict) -> Di
     activas = {h.regla_id for h in c.hallazgos}
     dura = any(h.dura for h in c.hallazgos)
 
+    if d is None:
+        return _base(c, categoria=config.CAT_SEGUIMIENTO, confianza=0.0, fuente="politica_hitl",
+                     motivo="Información Insuficiente: zona gris sin dictamen automático; requiere revisión humana",
+                     escalado_humano=True)
+    conf = min(max(float(d.confianza), 0.0), 1.0)
+    llm = {"sugerencia_llm": d.categoria, "confianza_llm": round(conf, 3)}
+
     def seguimiento(motivo: str, conf: float = 0.0) -> Dictamen:
         return _base(c, categoria=config.CAT_SEGUIMIENTO, confianza=round(conf, 3), fuente="politica_hitl",
-                     motivo=motivo, escalado_humano=True)
+                     motivo=motivo, escalado_humano=True, **llm)
 
-    if d is None:
-        return seguimiento("Información Insuficiente: zona gris sin dictamen automático; requiere revisión humana")
-    conf = min(max(float(d.confianza), 0.0), 1.0)
     sugerencia = f"LLM sugirió '{d.categoria}' ({conf:.0%}): {d.justificacion}"
     inventadas = set(d.reglas_citadas) - activas
     if inventadas:
@@ -132,7 +136,7 @@ def aplicar_politica(c: CasoAuditado, d: Optional[DictamenLLM], cfg: dict) -> Di
     if d.categoria == config.CAT_FP and (dura or not historial_suficiente(c)[0]):
         return seguimiento(f"Señales mixtas (regla dura o sin historial). {sugerencia}", conf)
     return _base(c, categoria=d.categoria, confianza=round(conf, 3), fuente="llm", motivo=d.justificacion,
-                 escalado_humano=d.categoria != config.CAT_FP)
+                 escalado_humano=d.categoria != config.CAT_FP, **llm)
 
 
 def _prompt_casos(data: AuditorOutput, casos: list[CasoAuditado]) -> str:

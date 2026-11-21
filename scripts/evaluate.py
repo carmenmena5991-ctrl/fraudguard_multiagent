@@ -52,6 +52,7 @@ def main() -> None:
                           "categoria": d.categoria, "fuente": d.fuente, "score": d.score_reglas,
                           "score_modelo_max": caso.metricas.score_modelo_max, "sin_historial": caso.sin_historial,
                           "reglas": ",".join(d.reglas_activadas),
+                          "sugerencia_llm": d.sugerencia_llm, "confianza_llm": d.confianza_llm,
                           "fraude_real": int(fraude_caso.get(d.cliente_id, 0))})
         reportes.append({"archivo": row.archivo, "semana": row.semana_iso, "latencia_s": r.latencia_s,
                          "dictamen": r.informe.dictamen_reporte, "fraude_real": int(fraude_caso.max())})
@@ -70,6 +71,8 @@ def main() -> None:
         "latencia_media_s": round(reps["latencia_s"].mean(), 3), "latencia_max_s": round(reps["latencia_s"].max(), 3),
         "fuente_dictamen": casos["fuente"].value_counts().to_dict(),
     }
+    if a.llm:
+        res["sugerencias_llm"] = sugerencias_llm(casos)
     config.OUTPUTS_DIR.mkdir(exist_ok=True)
     casos.to_csv(config.OUTPUTS_DIR / "evaluacion_casos.csv", index=False)
     (config.OUTPUTS_DIR / "evaluacion_kpis.json").write_text(json.dumps(res, ensure_ascii=False, indent=2), "utf-8")
@@ -89,6 +92,28 @@ def metricas(df: pd.DataFrame) -> dict:
         if (df["categoria"] == config.CAT_FRAUDE).any() else None,
         "matriz_confusion": {cat: {"legitimo": int(cm.loc[cat, 0]), "fraude": int(cm.loc[cat, 1])}
                              for cat in cm.index},
+    }
+
+
+def sugerencias_llm(df: pd.DataFrame) -> dict:
+    """Qué sugirió el LLM en la zona gris frente a la etiqueta real, antes de aplicar la política HITL.
+
+    Sirve para dos preguntas del informe: ¿el LLM prioriza mejor los fraudes reales? y ¿habría
+    descartado fraudes si la política no lo impidiera?
+    """
+    s = df[df["sugerencia_llm"].notna()]
+    if s.empty:
+        return {"n_casos": 0}
+    tabla = pd.crosstab(s["sugerencia_llm"], s["fraude_real"]).reindex(
+        index=list(config.CATEGORIAS), columns=[0, 1], fill_value=0)
+    conf = s.groupby("fraude_real")["confianza_llm"].mean()
+    return {
+        "n_casos": len(s),
+        "sugerencia_vs_real": {cat: {"legitimo": int(tabla.loc[cat, 0]), "fraude": int(tabla.loc[cat, 1])}
+                               for cat in tabla.index},
+        "fraudes_que_sugirio_descartar": int(tabla.loc[config.CAT_FP, 1]),
+        "confianza_media": {"legitimo": round(float(conf.get(0, float("nan"))), 3),
+                            "fraude": round(float(conf.get(1, float("nan"))), 3)},
     }
 
 

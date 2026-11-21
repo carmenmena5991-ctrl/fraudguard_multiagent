@@ -65,12 +65,29 @@ El sistema funciona sin key en **modo determinista**: los agentes usan solo regl
 riesgo y la plantilla del informe, y los casos dudosos pasan al analista. Este modo da exactamente
 los mismos KPIs en cualquier computadora y no tiene costo.
 
-Para habilitar el LLM, **cada integrante usa su propia key**:
+Para habilitar el LLM, **cada integrante usa su propia credencial**. La cuenta de
+[console.anthropic.com](https://console.anthropic.com) necesita créditos cargados. Hay dos formas:
 
-1. Crea una key en [console.anthropic.com](https://console.anthropic.com) → **API Keys**. La cuenta
-   necesita créditos cargados.
-2. Pégala en tu `.env` local, en `ANTHROPIC_API_KEY=`.
-3. Confirma que funciona con un solo reporte:
+**Opción A: `ant auth login` (recomendada, no hay que copiar ninguna key).** Instala la herramienta
+`ant` de Anthropic en tu carpeta personal, sin `sudo`:
+
+```bash
+VERSION=2.12.1
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+case $(uname -m) in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 ;; esac
+mkdir -p ~/.local/bin
+curl -fsSL "https://github.com/anthropics/anthropic-cli/releases/download/v${VERSION}/ant_${VERSION}_${OS}_${ARCH}.tar.gz" \
+  | tar -xz -C ~/.local/bin ant
+```
+
+Abre una terminal nueva, corre `ant auth login`, entra con tu cuenta en el navegador y confirma con
+`ant auth status` (debe aparecer una credencial `(active)`). La credencial queda en
+`~/.config/anthropic/`, fuera del repo, y el sistema la detecta solo.
+
+**Opción B: API key en `.env`.** Crea una key en la Console → **API Keys** (en "¿dónde la vas a
+usar?", escoge *Tu propia computadora*) y pégala en tu `.env` local, en `ANTHROPIC_API_KEY=`.
+
+Con cualquiera de las dos, confirma que funciona con un solo reporte:
    `PYTHONPATH=src python -m fraudguard.orchestrator data/reports/alerta_20180402_0900.csv`.
    Al final debe decir `LLM=sí`.
 
@@ -109,6 +126,13 @@ Calibración en semanas W14–W17; prueba ciega en W18–W22 (73 reportes, 2,947
 
 El KPI de FP filtrados se reporta segmentado por historial del cliente. La decisión y su
 justificación están en [`docs/decision_kpi_falsos_positivos.md`](docs/decision_kpi_falsos_positivos.md).
+
+**Con LLM (prueba de 5 reportes de W18, 153 casos):** los dictámenes son idénticos a los del modo
+determinista. Claude da entre 50 % y 65 % de confianza en la zona gris, por debajo del 85 % que exige
+la política, así que esos casos pasan al analista con una justificación. El tiempo por alerta sube a
+26 s en promedio (máx. 50 s, con los lotes en paralelo) y el costo es de unos $0.15 por reporte. La
+corrida completa de W18–W22 con LLM está pendiente; `evaluate.py --llm` reporta además qué sugirió
+Claude frente a la etiqueta real (`sugerencias_llm`).
 
 **Trade-off recall vs. filtrado de FP** (umbral del modelo para descartar clientes *Sin Historial*, `config/rules.json → modelo_riesgo.umbral_bajo`):
 
