@@ -76,8 +76,13 @@ Calibración en semanas W14–W17; prueba ciega en W18–W22 (73 reportes, 2,947
 |---|---|---|
 | Recall de fraude (casos fraudulentos no descartados) | 100% | **100%** |
 | Precisión de *Posible Fraude Confirmado* | — | **100%** (6/6) |
-| FP filtrados automáticamente | > 85% | **19.3%** |
-| Tiempo de dictamen por alerta | < 2 min | **~0.6 s** (máx. 1.9 s) |
+| FP filtrados automáticamente, clientes con historial | > 85% | **86.1%** |
+| FP filtrados automáticamente, clientes sin historial | conservador | **9.0%** |
+| FP filtrados automáticamente, total | — | **19.3%** |
+| Tiempo de dictamen por alerta | < 2 min | **~0.6 s** (máx. 2.1 s) |
+
+El KPI de FP filtrados se reporta segmentado por historial del cliente. La decisión y su
+justificación están en [`docs/decision_kpi_falsos_positivos.md`](docs/decision_kpi_falsos_positivos.md).
 
 **Trade-off recall vs. filtrado de FP** (umbral del modelo para descartar clientes *Sin Historial*, `config/rules.json → modelo_riesgo.umbral_bajo`):
 
@@ -88,7 +93,7 @@ Calibración en semanas W14–W17; prueba ciega en W18–W22 (73 reportes, 2,947
 | 0.010 | 96.1% | 34.5% |
 | 0.030 | 82.2% | 56.3% |
 
-El 83% de los casos son clientes sin historial previo, y en IEEE-CIS las reglas de volumen casi no separan fraude: la señal fuerte viene de las listas de bloqueo y del modelo. Las palancas pendientes para acercarse al 85% de filtrado son la zona gris con el LLM habilitado y un mejor modelo de riesgo (features de agregación por cliente).
+El 87% de los casos legítimos son clientes sin historial previo, y en IEEE-CIS las reglas de volumen casi no separan fraude: la señal fuerte viene de las listas de bloqueo y del modelo (AUC 0.81 a nivel caso). A recall 100%, ni el LLM (la política impide descartar casos sin historial) ni un mejor modelo alcanzan el 85% total, por eso la meta se replantea por segmento.
 
 ## Estructura
 

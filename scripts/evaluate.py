@@ -61,7 +61,12 @@ def main() -> None:
     casos, reps = pd.DataFrame(filas), pd.DataFrame(reportes)
     res = {
         "n_reportes": len(reps), "n_casos": len(casos), "llm": a.llm,
-        "casos": metricas(casos), "reportes": metricas(reps.rename(columns={"dictamen": "categoria"})),
+        "casos": metricas(casos),
+        # KPI segmentado (decisión docs/decision_kpi_falsos_positivos.md): la meta de > 85% de FP
+        # filtrados se evalúa sobre clientes con historial; sin historial la política es conservadora.
+        "casos_por_historial": {("sin_historial" if sh else "con_historial"): metricas(g)
+                                for sh, g in casos.groupby("sin_historial")},
+        "reportes": metricas(reps.rename(columns={"dictamen": "categoria"})),
         "latencia_media_s": round(reps["latencia_s"].mean(), 3), "latencia_max_s": round(reps["latencia_s"].max(), 3),
         "fuente_dictamen": casos["fuente"].value_counts().to_dict(),
     }
