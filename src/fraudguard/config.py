@@ -56,4 +56,12 @@ def llm_enabled() -> bool:
         return False
     if LLM_MODE == "on":
         return True
-    return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"))
+    if os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"):
+        return True
+    return _perfil_ant()
+
+
+def _perfil_ant() -> bool:
+    """¿Hay una credencial guardada por `ant auth login`? El SDK de Anthropic la usa sola."""
+    base = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config")) / "anthropic" / "credentials"
+    return base.is_dir() and any(base.glob("*.json"))

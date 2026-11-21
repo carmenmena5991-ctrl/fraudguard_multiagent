@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -11,7 +12,7 @@ from fraudguard.agents import ClasificadorAgent, SintetizadorAgent
 from fraudguard.llm import LLMClient
 from fraudguard.schemas import LoteDictamenesLLM, ResumenLLM, SintetizadorInput
 
-from test_pipeline import CLI_BLOQ, CLI_NUEVO, audit, listas, perfiles, run_all  # noqa: F401
+from test_pipeline import CLI_BLOQ, CLI_NUEVO, _csv, _tx, audit, listas, perfiles, run_all  # noqa: F401
 
 
 class FakeLLM:
@@ -86,6 +87,34 @@ def test_llm_omite_un_caso_escala_al_analista(audit, perfiles, listas):
         return lote
     _, _, d = _clasificar(audit, perfiles, listas, FakeLLM(responder))
     assert d[CLI_NUEVO].categoria == config.CAT_SEGUIMIENTO and d[CLI_NUEVO].fuente == "politica_hitl"
+
+
+def test_lotes_se_envian_en_paralelo(audit, perfiles, listas, monkeypatch):
+    # Tres clientes sin historial -> tres casos en zona gris; con lotes de 1 caso, tres llamadas.
+    nuevos = ["1" * 16, "2" * 16, "3" * 16]
+    rows = [_tx(100 + i, cid, 1200, i) for i, cid in enumerate(nuevos)]
+    _, aud, _, _ = run_all(audit, perfiles, listas, contenido=_csv(rows))
+    monkeypatch.setitem(config.rules()["clasificador"], "max_casos_por_llamada_llm", 1)
+    # Si los lotes se enviaran uno tras otro, la barrera nunca se completaría (BrokenBarrierError).
+    barrera = threading.Barrier(len(nuevos), timeout=5)
+
+    def responder(user, schema):
+        barrera.wait()
+        return _lote(user, config.CAT_SEGUIMIENTO, 0.9, reglas=())
+    llm = FakeLLM(responder)
+    cla = ClasificadorAgent(audit, "t", llm=llm).run(aud)
+    assert len(llm.llamadas) == len(nuevos)
+    assert {d.cliente_id for d in cla.dictamenes} == set(nuevos)
+    assert all(d.fuente == "llm" for d in cla.dictamenes)
+
+
+def test_dictamen_de_otro_lote_se_ignora(audit, perfiles, listas):
+    def responder(user, schema):
+        lote = _lote(user, config.CAT_FRAUDE, 0.95, reglas=())
+        lote.dictamenes.append(lote.dictamenes[0].model_copy(update={"cliente_id": "e" * 16}))
+        return lote
+    _, _, d = _clasificar(audit, perfiles, listas, FakeLLM(responder))
+    assert "e" * 16 not in d
 
 
 # ---------- Agente 4 con LLM ----------

@@ -20,6 +20,7 @@ REQUIRED = ["id_alerta", "corte", "transaction_id", "fecha_hora", "cliente_id", 
 OPTIONAL = ["tarjeta_id", "producto", "tipo_tarjeta", "red_tarjeta", "region", "distancia",
             "dominio_email", "tipo_dispositivo", "dispositivo_id"]
 # Columnas que podrían traer PII en un export real: se eliminan o se hashean.
+ID_COLS = ["id_alerta", "corte", "cliente_id", "tarjeta_id", "dispositivo_id"]
 PII_DROP = ["nombre", "nombre_cliente", "email", "telefono", "direccion", "numero_tarjeta", "pan", "cuenta"]
 HEX16 = re.compile(r"^[0-9a-f]{16,64}$")
 SEG_ORDER = {"Bajo": 0, "Medio": 1, "Alto": 2}
@@ -40,7 +41,8 @@ class IngestaAgent(BaseAgent[IngestaInput, IngestaOutput]):
             raise AgentError("El archivo no es un CSV de reporte transaccional. Cargue el reporte del corte.")
         self.use_tool("pandas.read_csv")
         try:
-            df = pd.read_csv(io.BytesIO(data.contenido_csv))
+            # Los IDs anonimizados son hex: sin dtype=str, un ID como "1234e567..." se leería como número.
+            df = pd.read_csv(io.BytesIO(data.contenido_csv), dtype={c: str for c in ID_COLS})
         except Exception as e:
             raise AgentError(f"Archivo corrupto o ilegible: {e}. Solicite recarga del reporte.") from e
 

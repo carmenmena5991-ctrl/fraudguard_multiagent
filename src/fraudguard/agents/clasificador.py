@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from fraudguard import config
@@ -62,11 +63,16 @@ class ClasificadorAgent(BaseAgent[AuditorOutput, ClasificadorOutput]):
         if gris and self.llm and self.llm.enabled:
             self.use_tool("llm_structured_outputs")
             n = cfg["max_casos_por_llamada_llm"]
-            for i in range(0, len(gris), n):
-                lote = gris[i:i + n]
-                res = self.llm.parse(self.nombre, SYSTEM_PROMPT, _prompt_casos(data, lote), LoteDictamenesLLM)
+            lotes = [gris[i:i + n] for i in range(0, len(gris), n)]
+            # Los lotes son independientes: se envían en paralelo para cumplir el KPI de < 2 min por alerta.
+            with ThreadPoolExecutor(max_workers=min(len(lotes), cfg.get("max_llamadas_paralelas_llm", 4))) as ex:
+                resultados = list(ex.map(
+                    lambda lote: self.llm.parse(self.nombre, SYSTEM_PROMPT, _prompt_casos(data, lote),
+                                                LoteDictamenesLLM), lotes))
+            for lote, res in zip(lotes, resultados):
                 if res:
-                    llm_out.update({d.cliente_id: d for d in res.dictamenes})
+                    ids_lote = {c.cliente_id for c in lote}
+                    llm_out.update({d.cliente_id: d for d in res.dictamenes if d.cliente_id in ids_lote})
 
         if gris:
             self.use_tool("politica_hitl")
