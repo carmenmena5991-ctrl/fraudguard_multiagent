@@ -47,17 +47,43 @@ y genera un informe ejecutivo con evidencia trazable.
 ## Instalación
 
 ```bash
-git clone https://github.com/<usuario>/fraudguard_multiagent.git
+git clone https://github.com/carmenmena5991-ctrl/fraudguard_multiagent.git
 cd fraudguard_multiagent
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # opcional: ANTHROPIC_API_KEY para habilitar el LLM
+cp .env.example .env          # opcional: tu ANTHROPIC_API_KEY para habilitar el LLM (ver abajo)
 
 # Descargar train_transaction.csv.zip y train_identity.csv.zip de
 # https://www.kaggle.com/competitions/ieee-fraud-detection/data
 python scripts/extract_data.py ~/Downloads/train_transaction.csv.zip ~/Downloads/train_identity.csv.zip
 PYTHONPATH=src python -m fraudguard.data_prep    # ~3 min, ~4 GB RAM
 ```
+
+### API key de Claude (opcional, individual)
+
+El sistema funciona sin key en **modo determinista**: los agentes usan solo reglas, el modelo de
+riesgo y la plantilla del informe, y los casos dudosos pasan al analista. Este modo da exactamente
+los mismos KPIs en cualquier computadora y no tiene costo.
+
+Para habilitar el LLM, **cada integrante usa su propia key**:
+
+1. Crea una key en [console.anthropic.com](https://console.anthropic.com) → **API Keys**. La cuenta
+   necesita créditos cargados.
+2. Pégala en tu `.env` local, en `ANTHROPIC_API_KEY=`.
+3. Confirma que funciona con un solo reporte:
+   `PYTHONPATH=src python -m fraudguard.orchestrator data/reports/alerta_20180402_0900.csv`.
+   Al final debe decir `LLM=sí`.
+
+Reglas:
+
+- **No compartas tu key ni la subas al repo.** `.env` está en `.gitignore`. Si una key se expone,
+  revócala en la Console y crea otra.
+- **Cada llamada consume créditos de quien es la key.** Empieza con
+  `python scripts/evaluate.py --llm --max-reportes 5` antes de correr una evaluación completa. La
+  bitácora (`logs/`, tabla `llamadas_llm`) registra los tokens de cada llamada.
+- **Las corridas con LLM pueden variar un poco** porque Claude no responde idéntico cada vez. Los
+  resultados de la corrida oficial con LLM se copian a `docs/resultados/` (que sí está en el repo;
+  `outputs/` no) para que el equipo los consulte sin volver a pagarla.
 
 ## Uso
 
